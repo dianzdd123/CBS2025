@@ -59,16 +59,20 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, save_pref
     for epoch in range(epochs):
         model.train()
         total_loss = 0.0
+        seen_samples = 0
         for imgs, targets in train_loader:
             imgs, targets = imgs.to(device), targets.to(device)
             optimizer.zero_grad()
-            preds = model(imgs).squeeze()
+            preds = model(imgs).reshape(-1)
             loss = criterion(preds, targets)
             loss.backward()
             optimizer.step()
-            total_loss = 0.0
+            total_loss += loss.item() * imgs.size(0)
+            seen_samples += imgs.size(0)
             
-        print(f"Epoch {epoch+1} - Total Loss: {total_loss:.4f}")
+        if not seen_samples:
+            raise ValueError("Training loader produced no batches; check dataset size and batch size.")
+        print(f"Epoch {epoch+1} - Mean training loss: {total_loss / seen_samples:.4f}")
         torch.save(model.state_dict(), f"{save_prefix}_latest.pth")
 
         val_mse = evaluate(model, val_loader)
@@ -84,7 +88,7 @@ def evaluate(model, loader):
     with torch.no_grad():
         for imgs, targets in loader:
             imgs = imgs.to(device)
-            preds = model(imgs).squeeze().cpu().numpy()
+            preds = model(imgs).reshape(-1).cpu().numpy()
             # print(preds.shape)
             all_preds.extend(preds)
             all_targets.extend(targets.numpy())
@@ -96,7 +100,7 @@ def test_model(model, loader):
     with torch.no_grad():
         for imgs, targets in loader:
             imgs = imgs.to(device)
-            preds = model(imgs).squeeze().cpu().numpy()
+            preds = model(imgs).reshape(-1).cpu().numpy()
             all_preds.extend(preds)
             all_targets.extend(targets.numpy())
     mse = mean_squared_error(all_targets, all_preds)
@@ -118,8 +122,8 @@ for size in data_sizes:
     print(f"Train: {len(train_ds)}, Val: {len(val_ds)}, Test: {len(test_ds)}")
     
     train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, drop_last=True)
-    val_loader = DataLoader(val_ds, batch_size=16, drop_last=True)
-    test_loader = DataLoader(test_ds, batch_size=16, drop_last=True)
+    val_loader = DataLoader(val_ds, batch_size=16, drop_last=False)
+    test_loader = DataLoader(test_ds, batch_size=16, drop_last=False)
     
     for model_name in model_names:
         print(f"\n🚀 Training {model_name.upper()}... with data {size*100}%")

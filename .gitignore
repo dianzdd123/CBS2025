@@ -1,0 +1,10 @@
+
+
+# Local development artefacts and credentials
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.env
+.env.*
+!.env.example
